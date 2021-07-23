@@ -22,7 +22,6 @@ export default {
     simulation : null,
     miniSimulation: null,
     newSimulation: null,
-    svgBrush: null,
     k : 1,
     tx : 0,
     ty :0,
@@ -48,41 +47,28 @@ export default {
       "id":"E0",
       x : 10,
       y : 300},
-      {"name": "F",
-      "id":"F0",
+      {"name": "E",
+      "id":"E0",
       x : 48,
       y : 12},
-      {"name": "G",
-      "id":"G0",
+      {"name": "E",
+      "id":"E0",
       x : 48,
-      y : 178},
-      {"name": "H",
-      "id":"H0",
-      x : 90,
-      y : 178},
-      {"name": "I",
-      "id":"I0",
-      x : 67,
-      y : 117},
-      {"name": "J",
-      "id":"J0",
-      x : 242,
-      y : 105}
+      y : 178}
       ],
-    arrayK : [0,0,0],
-    arrayTx:[0,0,0,0,0],
-    arrayTy:[0,0,0,0,0],
+    deltaY: 0,
+    deltaArray:[],
+    arrayK : [],
+    arrayTx:[],
+    arrayTy:[],
     zooms: null,
     brush: null,
+    timeStamp : 0,
+    ArrayTimeStamp: [0,0],
     i : 0,
     bbox: null,
     arrayBbox: [],
-    signal : null,
-    eventType : null,
-    tFlag: null,
-    bFlag: true,
-    userActionStatus: [0,0,0,0,0],
-    previousUserStatus: null,
+    
     }
   },
   methods: {
@@ -130,69 +116,126 @@ export default {
             zoom.transform,
             d3.zoomIdentity.translate(x[x.length-2], y[y.length-2]).scale(k[k.length-2]))
     },
-    
   },
   
   watch: {
 
-    i(){
-        let d3length = d3.selectAll('.inbox')._groups[0].length
-        let eachCx = []
-        let eachCy = []
-        for(let step = 0; step < d3length; step++){
-          eachCx.push(d3.selectAll('.inbox')._groups[0][step].cx.baseVal.value)
-          eachCy.push(d3.selectAll('.inbox')._groups[0][step].cy.baseVal.value)
-        }
-        let selectedBBox = [[Math.min(...eachCx), Math.min(...eachCy)], [Math.max(...eachCx), Math.max(...eachCy)]]
-        let bboxX = selectedBBox[0][0] - 10
-        let bboxY = selectedBBox[0][1] - 10
-        let bboxHeight = Math.max(selectedBBox[1][0]-selectedBBox[0][0], selectedBBox[1][1]-selectedBBox[0][1]) + 20 // eslint-disable-line no-unused-vars
-        const scaleX = (k)=>{ // eslint-disable-line no-unused-vars
-          return d3.scaleLinear([0,this.width],[0,this.width * k])
-        }
-        const scaleY = (k)=>{ // eslint-disable-line no-unused-vars
-          return d3.scaleLinear([0,this.height],[0,this.height * k])
-        }
+    timeStamp(){
+      let tFlag = true
+      let tTime = setTimeout(()=>{}, 1500)
+      this.bbox=d3.select('.miniBbox').node().getBBox()
+      this.arrayBbox.push(this.bbox)
+      if(this.deltaArray[0] < 0 && tFlag == true){
+        tFlag = false
+        this.zoomIn(this.arrayTx, this.arrayTy, this.arrayK, this.svg, this.zooms)
+        console.log("zoomin")
+        clearTimeout(tTime)
+        if(this.ArrayTimeStamp[this.ArrayTimeStamp.length-1]-this.ArrayTimeStamp[this.ArrayTimeStamp.length-5] > 1000){
+          const newData = {'name' : 'G', 'id' : 'A5', 'x' : 139, 'y' : 276}
+          this.node.push(newData)
+          d3.selectAll('circle')
+             .remove()
 
-        this.bFlag = false
-        this.gCam.attr("transform", "translate("+ scaleX(this.k)(-bboxX)+"," +scaleY(this.k)(-bboxY) +")" +"scale("+this.k+")")
-        this.svgMap.call(
-        this.zooms.transform,
-        d3.zoomIdentity.translate(scaleX(this.width / bboxHeight)(-bboxX), scaleY(this.width / bboxHeight)(-bboxY)).scale(this.width / bboxHeight)
-        )
-        this.bFlag = true
-        this.arrayK=[0,0,0]
-        eachCx = []
-        eachCy = []
-        selectedBBox = []
-        console.log("보정")
+          this.minimapScatter = this.miniMap
+            .selectAll('g')
+            .data(this.node)
+            .join('g')
+            .append('circle')
+            .attr('r', 10)
+          // this.newTick
+          // this.newSimulation
+          let startTime = Date.now()
+          let endTime = startTime + 1000
+          this.newTick = ()=>{
+            if(Date.now() < endTime){
+                return this.minimapScatter
+                  .attr('cx', (d)=>{ 
+                    return d.x
+                  })
+                  .attr('cy', (d)=> {
+                    return d.y
+                  })
+                  .on("click", (d)=>{
+                    console.log("hi", d.target)
+                  })
+            } else {
+                this.newSimulation.stop()
+            }     
+          }
+          this.newSimulation = d3.forceSimulation(this.node)
+            .force('charge', d3.forceManyBody().strength(30))
+            .force('center', d3.forceCenter(this.brushX, this.brushY))
+            .force('collision', d3.forceCollide().radius(11))
+            .on('tick', this.newTick)
+          
+          this.scatter = this.svgMap
+            .selectAll('g')
+            .data(this.node)
+            .join('g')
+            .append('circle')
+            .attr("r", 10)
+            .attr('cx', (d)=>{ 
+                  return d.x
+                })
+                .attr('cy', (d)=> {
+                  return d.y
+                })
+                .on("click", (d)=>{
+                  console.log("hi", d.target)
+                })
+
+          this.svg.call(
+          this.zooms.transform, 
+          d3.zoomIdentity.translate(-this.arrayBbox[this.i].x * this.height/this.arrayBbox[this.i].height, 
+            -this.arrayBbox[this.i].y * this.height/this.arrayBbox[this.i].height)
+            .scale(this.width/this.arrayBbox[this.i].height))
+          
+
+          this.i = this.i + 1
+          console.log("time to reset")
+          tFlag = true
+          this.deltaArray = []
+        }
+      }
+
+
+      
+      else if(this.deltaArray[0] > 0 && tFlag == true){
+        tFlag = false
+        this.zoomOut(this.arrayTx, this.arrayTy, this.arrayK, this.svg, this.zooms)
+        console.log("zoomout")
+        if(this.ArrayTimeStamp[this.ArrayTimeStamp.length-1]-this.ArrayTimeStamp[this.ArrayTimeStamp.length-5] > 1000){
+           this.svg.call(
+            this.zooms.transform, 
+            d3.zoomIdentity.translate(-this.arrayBbox[this.i].x * this.height/this.arrayBbox[this.i].height, 
+            -this.arrayBbox[this.i].y * this.height/this.arrayBbox[this.i].height)
+            .scale(this.width/this.arrayBbox[this.i].height))
+          console.log("time to reset")
+          tFlag = true
+          this.deltaArray = []
+        }
+      }
+      else if(this.deltaArray[0] == null && tFlag == true){
+        tFlag = false
+        this.panning(this.arrayTx, this.arrayTy, this.arrayK, this.svg, this.zooms)
+        console.log("panning")
+        if(this.ArrayTimeStamp[this.ArrayTimeStamp.length-1]-this.ArrayTimeStamp[this.ArrayTimeStamp.length-5] > 1000){
+          this.svg.call(
+            this.zooms.transform, 
+            d3.zoomIdentity.translate(-this.arrayBbox[this.i].x * this.height/this.arrayBbox[this.i].height, 
+            -this.arrayBbox[this.i].y * this.height/this.arrayBbox[this.i].height)
+            .scale(this.width/this.arrayBbox[this.i].height))
+          console.log("time to reset")
+          tFlag = true
+          this.deltaArray = []
+        }
+      }
     }
   },
 
 
 
   mounted() {
-
-    setInterval(()=>{
-      this.userActionStatus.unshift(0)
-      this.userActionStatus.pop()
-      
-      for(let step = 1; step < 3; step++){
-        if(this.userActionStatus[step]==1){
-          this.tFlag = true          
-       }
-      }
-      if(this.tFlag == true && this.userActionStatus[0]==0 && 
-        this.userActionStatus[1]==0 && this.userActionStatus[2]==0 &&
-        this.userActionStatus[3]==0 && this.userActionStatus[4]==0){
-        this.bFlag = true
-        this.i = this.i + 1
-        this.tFlag = false
-        console.log('시간보정')
-      }
-    }, 300)
-
-
     this.svg = d3.select('#app')
       .append('svg')
       .attr('width', 500)
@@ -211,6 +254,7 @@ export default {
       .attr('width', this.width)
       .attr('height', this.height)
       .attr('class', 'miniBbox')
+    //circle upating function by force
     
     let startTime = Date.now()
     let endTime = startTime + 1000
@@ -248,13 +292,18 @@ export default {
         this.miniSimulation.stop()
       }
     }
+    //circle upating function by force
 
-    this.gCam = this.svgMap.append('g')
-    this.scatter = this.gCam
-      .selectAll('circle')
+    //circle assign
+    this.scatter = this.svgMap
+      .selectAll('g')
       .data(this.node)
-      .join('circle')
+      .join('g')
+      .append('circle')
       .attr("r", 10)
+      .attr("class", (d)=>{
+        return d.name
+      })
       .attr("id", (d)=>{
         return d.id
       })
@@ -265,10 +314,9 @@ export default {
       .join('g')
       .append('circle')
       .attr("r", 10)
-      .attr("id", (d)=>{
-        return d.id
-      })
+    //circle assign
 
+    //force simulation
     this.simulation = d3.forceSimulation(this.node) // eslint-disable-line no-unused-vars
       .force('charge', d3.forceManyBody().strength(90))
       .force('center', d3.forceCenter(this.width / 2, this.height / 2))
@@ -280,118 +328,79 @@ export default {
       .force('center', d3.forceCenter(this.width / 2, this.height / 2))
       .force('collision', d3.forceCollide().radius(15))
       .on('tick', miniMapTicked)
+    //force simulation
+
+    const svgBrush = this.miniMap
+      .append('g')
     
-    this.onZoom = (event)=>{
-      if ((event.type == 'brush')) 
-        {return null}
+    const onZoom = (event)=>{
+      if ((event.sourceEvent && event.sourceEvent.type === "brush")) 
+        return null
 
       this.k = event.transform.k // eslint-disable-line no-unused-vars
       this.tx = event.transform.x // eslint-disable-line no-unused-vars
       this.ty = event.transform.y // eslint-disable-line no-unused-vars
-      if(this.bFlag == true){
-        this.userActionStatus.unshift(1)
-        this.userActionStatus.pop()
-        this.arrayK.unshift(this.k)
-        this.arrayK.pop()
-        console.log()
-        if(this.arrayK[2]>this.arrayK[1] && this.arrayK[1]>this.arrayK[0] == false &&
-          this.arrayK[0] !=0 && this.arrayK[1] != 0 && this.arrayK[2] != 0){
-          console.log(this.arrayK[0])
-          console.log('줌아웃 변환 보정')
-          this.i = this.i + 1
-        }
-        else if(this.arrayK[2]<this.arrayK[1] && this.arrayK[1]<this.arrayK[0] == false &&
-          this.arrayK[0] !=0 && this.arrayK[1] != 0 && this.arrayK[2] != 0){
-          console.log(this.arrayK[0])
-          console.log('줌인 변환 보정')
-          this.i = this.i + 1
-        }
-        else if(this.arrayK[2]==this.arrayK[1] && this.arrayK[1]!=this.arrayK[0] &&
-          this.arrayK[0] !=0 && this.arrayK[1] != 0 && this.arrayK[2] != 0){
-          console.log(this.arrayK[0])
-          console.log('패닝 변환 보정')
-          this.i = this.i + 1
-        }
-      }
-
-  
-      // if(this.arrayK[2]<this.arrayK[1] && this.arrayK[1]<this.arrayK[0] == false){
-      //     console.log('변환 보정')
-      //     this.i = this.i + 1
-      //   }
-      // if(this.arrayK[2]==this.arrayK[1] && this.arrayK[1]==this.arrayK[0] == false){
-      //     console.log('변환 보정')
-      //     this.i = this.i + 1
-      //   }
-       
-      this.gCam.attr('transform', event.transform)
-      
+      console.log(this.k, this.tx, this.ty)
+      this.deltaY = event.sourceEvent.deltaY
+      this.deltaArray.push(this.deltaY)
+      this.arrayK.push(this.k)
+      this.arrayTx.push(this.tx)
+      this.arrayTy.push(this.ty)
+      this.timeStamp=event.sourceEvent.timeStamp
+      this.ArrayTimeStamp.push(this.timeStamp)
+      this.svgMap.attr('transform', event.transform)
+      this.scatter.attr('transform', event.transform)
       const scaleX = (k)=>{ // eslint-disable-line no-unused-vars
         return d3.scaleLinear([0,this.width],[0,this.width * k])
       }
       const scaleY = (k)=>{ // eslint-disable-line no-unused-vars
         return d3.scaleLinear([0,this.height],[0,this.height * k])
       }
-      this.brush.move(this.svgBrush, [
+      this.brush.move(svgBrush, [
         [scaleX(this.k).invert(-this.tx), scaleY(this.k).invert(-this.ty)],
         [scaleX(this.k).invert(-this.tx + this.width), scaleY(this.k).invert(-this.ty + this.height)],
       ])
     }
-
+        
     this.zooms = d3.zoom()
-      .on('zoom', this.onZoom)
-      
-    this.svgBrush = this.miniMap
-      .append('g')
+      .on('zoom start', onZoom)
 
-    this.onBrush = (event)=>{
-      if (event.type == 'zoom') 
-        {return null;}
-
+    
+    const onBrush = (event)=>{
+      if (event.sourceEvent && event.sourceEvent.type === "zoom") 
+        return null;
       if (Array.isArray(event.selection)){
-        this.brushX = event.selection[0][0]
-        this.brushY = event.selection[0][1]
-        this.minimapScatter.classed("outofBox", (d)=>{ // eslint-disable-line no-unused-vars
+        this.brushX = (event.selection[0][0] + event.selection[1][0])/2
+        this.brushY = (event.selection[0][1] + event.selection[1][1])/2
+        this.scatter.classed("selected", (d)=>{ // eslint-disable-line no-unused-vars
           return this.isBrushed(event.selection, d.x, d.y)
         })
-        this.minimapScatter.classed("inbox", (d)=>{ // eslint-disable-line no-unused-vars
+        this.scatter.classed("inbox", (d)=>{ // eslint-disable-line no-unused-vars
           return !this.isBrushed(event.selection, d.x, d.y)
         })
-        this.scatter.classed("clientGrey", (d)=>{ // eslint-disable-line no-unused-vars
-          return this.isBrushed(event.selection, d.x, d.y)
-        })
-        this.zoomscale = d3.zoomTransform(this.svgMap.node()).k
-   
-        // const scaleX = (k)=>{ // eslint-disable-line no-unused-vars
-        // return d3.scaleLinear([0,this.width],[0,this.width * k])
-        // }
-        // const scaleY = (k)=>{ // eslint-disable-line no-unused-vars
-        // return d3.scaleLinear([0,this.height],[0,this.height * k])
-        // }
-        // this.svgMap.call(
-        //   this.zooms.transform,
-        //   d3.zoomIdentity.translate(scaleX(this.zoomscale)(-this.brushX), scaleY(this.zoomscale)(-this.brushY)).scale(this.zoomscale)
-        // )
-        // this.gCam.attr("transform", "translate("+ scaleX(this.zoomscale)(-this.brushX)+"," +scaleY(this.zoomscale)(-this.brushY) +")" +"scale("+this.zoomscale+")")
-       
       }
     }
-
+  
     this.brush = d3.brush()
       .extent([[0,0], [this.width, this.height]])
-      .on("brush", this.onBrush)
+      .on("brush", onBrush)
 
-    this.svgMap.call(this.zooms)
+    this.svg.call(this.zooms)
       .on("dblclick.zoom", null)
       
-    this.svgBrush.call(this.brush)
-    this.brush.move(this.svgBrush, [
+
+    svgBrush.call(this.brush)
+    this.brush.move(svgBrush, [
       [0,0],
       [this.width * this.k, this.height * this.k]
     ])
-    this.miniMap.selectAll('.handle').remove()
-    this.miniMap.selectAll('.overlay').remove()
- 
+    this.svgMap.selectAll('.handle').remove()
+    this.svgMap.selectAll('.overlay').remove()
+    this.svgmini.selectAll('rect').remove()
+
+
+    
+   
   },
 
  
@@ -410,17 +419,13 @@ export default {
 circle {
   fill: cadetblue;
 }
-.outofBox {
+.selected {
   fill: red;
   opacity: 1;
 }
 .inbox {
   fill: rgb(0, 183, 255);
   opacity: 1;
-}
-.clientGrey{
-  fill: grey;
-  opacity: 0.7;
 }
 
 </style>
