@@ -166,6 +166,7 @@ export default {
         eachCy = []
         selectedBBox = []
         console.log("보정")
+        console.log('aa')
     }
   },
 
